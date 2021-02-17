@@ -140,6 +140,7 @@
         <Manifest_File>$(BDS)\bin\default_app.manifest</Manifest_File>
         <UWP_DelphiLogo44>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_44.png</UWP_DelphiLogo44>
         <UWP_DelphiLogo150>$(BDS)\bin\Artwork\Windows\UWP\delphi_UwpDefault_150.png</UWP_DelphiLogo150>
+        <Icon_MainIcon>icon.ico</Icon_MainIcon>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Base_Win64)'!=''">
         <DCC_UsePackage>DBXSqliteDriver;RESTComponents;OmniThreadLibraryRuntime;DBXInterBaseDriver;vclactnband;vclFireDAC;tethering;FireDACADSDriver;vcltouch;DragDropDR103R;vcldb;bindcompfmx;inetdb;IcsFmxD103Run;PascalScript_Core_D27;IcsVclD103Run;FireDACIBDriver;fmx;fmxdae;RadiantShapesFmx;dbexpress;IndyCore;vclx;dsnap;EsVclCore;FireDACCommon;RESTBackendComponents;VCLRESTComponents;soapserver;JclDeveloperTools;vclie;bindengine;DBXMySQLDriver;CloudService;EsVclComponents;FireDACMySQLDriver;FireDACCommonODBC;FireDACCommonDriver;inet;bindcompdbx;IndyIPCommon;vcl;IndyIPServer;IndySystem;dsnapcon;VirtualTreesR;FireDACMSAccDriver;fmxFireDAC;vclimg;Jcl;FireDAC;FireDACSqliteDriver;FireDACPgDriver;ChromeTabs_R;soaprtl;DbxCommonDriver;xmlrtl;soapmidas;fmxobj;vclwinx;GR32_R;rtl;DbxClientDriver;CustomIPTransport;vcldsnap;SynEditDR;bindcomp;appanalytics;IndyIPClient;bindcompvcl;IcsCommonD103Run;dbxcds;VclSmp;adortl;RadiantShapesFmx_Design;JclVcl;dsnapxml;dbrtl;inetdbxpress;IndyProtocols;JclContainers;fmxase;$(DCC_UsePackage)</DCC_UsePackage>
@@ -164,6 +165,8 @@
         <DCC_RemoteDebug>false</DCC_RemoteDebug>
         <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
         <AppDPIAwarenessMode>PerMonitorV2</AppDPIAwarenessMode>
+        <VerInfo_IncludeVerInfo>true</VerInfo_IncludeVerInfo>
+        <VerInfo_Locale>1033</VerInfo_Locale>
     </PropertyGroup>
     <PropertyGroup Condition="'$(Cfg_1_Win64)'!=''">
         <AppEnableRuntimeThemes>true</AppEnableRuntimeThemes>
@@ -211,6 +214,11 @@
                 <Source>
                     <Source Name="MainSource">CDisplayAI.dpr</Source>
                 </Source>
+                <Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dcloffice2k260.bpl">Microsoft Office 2000 Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="$(BDSBIN)\dclofficexp260.bpl">Microsoft Office XP Sample Automation Server Wrapper Components</Excluded_Packages>
+                    <Excluded_Packages Name="C:\Program Files (x86)\Raize\CS5\Bin\CodeSiteExpressPkg_Design260.bpl">CodeSite Express 5.3.3</Excluded_Packages>
+                </Excluded_Packages>
             </Delphi.Personality>
             <Deployment Version="3">
                 <DeployFile LocalName="$(BDS)\Redist\osx32\libcgunwind.1.0.dylib" Class="DependencyModule">

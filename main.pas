@@ -407,8 +407,8 @@ begin
       contours := AllocMem(SizeOf(tcvseq));
       cvClearMemStorage(storage);
       cvFindContours(dst, storage, @contours, SizeOf(TCvContour), CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cvPoint(0, 0));
-      cvArcLength(nil, contours, True);
-      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(100, 200, 0), 2, CV_FILLED, CV_AA, cvPoint(0, 0));
+//      cvArcLength(nil, contours., True);
+      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
 //      contours := cvConvexHull2(contours);
 //      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
 //      cvShowImage('thres', dst);
