@@ -24,7 +24,7 @@ As is right, now, currently this is the changelog:
 
 # Changelog
 
-###2021.02.17  
+### 2021.02.17  
    - Initial commit, a simple CBR, CBZ, CB7 support to load images directly from archive.
    - Zoom with wheel and bouncing drag image viewer
    - OpenCV detection of contours
