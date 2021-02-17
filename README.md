@@ -9,8 +9,8 @@ This project aims to be a CDisplay like comic viewer, but with modern UI and few
 
 # Main goals
 
-- [_] Detection of comic's individual frames using OpenCV.
-- [x] Detection of comic's dialog ballon text for latter use like:
+- [ ] Detection of comic's individual frames using OpenCV.
+- [ ] Detection of comic's dialog ballon text for latter use like:
   - [ ] Translation and overlay
   - [ ] Text To Speech
 - [ ] Filters like Anime4K, Waifu2x to restore/improve comic's lineart.
