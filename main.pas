@@ -419,26 +419,8 @@ begin
 end;
 
 procedure TForm2.MenuItem2Click(Sender: TObject);
-var
-  image: pIplImage;
-  dst: pIplImage;
-  img_gray: pIplImage;
-  contours: pCvSeq;
-  storage: pCvMemStorage;
-  fn: ansistring;
-  stream: TMemoryStream;
-  mat: PCvMat;
-  png: TPngImage;
-  ab: array of byte;
 begin
   if AniIndicator2.Visible then Abort;
-
-  image := nil;
-  dst := nil;
-  img_gray := nil;
-  contours := nil;
-  storage := nil;
-
 
   AniIndicator2.Enabled := True;
   AniIndicator2.Visible := True;
@@ -447,7 +429,26 @@ begin
   //#TODO: fix bug that sometimes it returns a blank picture, which didn't without threads
   Async(
     procedure
+    var
+      image: pIplImage;
+      dst: pIplImage;
+      img_gray: pIplImage;
+      contours: pCvSeq;
+      storage: pCvMemStorage;
+      fn: ansistring;
+      mat: PCvMat;
+      png: TPngImage;
+      ab: array of byte;
+      stream: TMemoryStream;
+      N: Integer;
+      contoursCont: Integer;
     begin
+      image := nil;
+      dst := nil;
+      img_gray := nil;
+      contours := nil;
+      storage := nil;
+
 //      Application.ProcessMessages;
 
 //        fn := ExtractFilePath(ParamStr(0))+'temp.png';
@@ -491,11 +492,33 @@ begin
             storage := cvCreateMemStorage(0);
             cvCvtColor(image, img_gray, CV_BGR2GRAY);
             cvThreshold(img_gray, dst, 128, 255, CV_THRESH_BINARY_INV);
-            contours := AllocMem(SizeOf(tcvseq));
+            //contours := AllocMem(SizeOf(tcvseq));
             cvClearMemStorage(storage);
-            cvFindContours(dst, storage, @contours, SizeOf(TCvContour), CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cvPoint(0, 0));
+            cvSmooth(dst, dst, CV_GAUSSIAN, 9, 9); //to improve speed in contour detection
+            contours := nil;
+            contoursCont :=  cvFindContours(dst, storage, @contours, SizeOf(TCvContour), CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cvPoint(0, 0));
+
+            //if (contoursCont > 0) and (contoursCont < 50) then
+            begin
+              while Assigned(contours) do
+                if CV_IS_SEQ_CLOSED(contours) then
+                begin
+                  //contours := cvConvexHull2(contours);
+                  var rect := cvBoundingRect(contours);
+                  if rect.width > 100  then
+                  begin
+                    cvRectangle(image, cvPoint(rect.x, rect.y),
+                      cvPoint(rect.x + rect.width, rect.y + rect.height),
+                        CV_RGB(-1,250,0), 3);
+                    cvDrawContours(image, contours,
+                        CV_RGB(255, 0, 0),
+                        CV_RGB(255, 0, 0), 2, -1, CV_AA, cvPoint(0, 0));
+                  end;
+                  contours := contours^.h_next;
+                end;
+            end;
+
       //      cvArcLength(nil, contours., True);
-            cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
       //      contours := cvConvexHull2(contours);
       //      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
     //        cvShowImage('thres', dst);
@@ -507,8 +530,8 @@ begin
             Sleep(100);
     //        ImageViewer2.Bitmap.LoadFromFile(fn);
             stream.Position := 0;
+            ImageViewer2.Bitmap.Clear(0);
             ImageViewer2.Bitmap.LoadFromStream(stream);
-      //      cvWaitKey(0);
 
             cvReleaseImage(image);
             cvReleaseImage(dst);
