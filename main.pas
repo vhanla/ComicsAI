@@ -10,7 +10,7 @@ uses
   System.Math.Vectors, FMX.Controls3D, FMX.Layers3D, FMX.Viewport3D,
   JclCompression, JclStrings, w2xconvunit, ocv.highgui_c, ocv.core_c,
   ocv.core.types_c, ocv.imgproc_c, ocv.imgproc.types_c, StrUtils, Winapi.Activex,
-  Vcl.Imaging.PngImage;
+  Vcl.Imaging.PngImage, OtlParallel, OtlEventMonitor;
 
 type
   TFileSorter = class(TStringList)
@@ -70,6 +70,8 @@ type
     MenuItem18: TMenuItem;
     MenuItem19: TMenuItem;
     MenuItem20: TMenuItem;
+    AniIndicator2: TAniIndicator;
+    OmniEventMonitor1: TOmniEventMonitor;
     procedure MenuItem3Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure ImageViewer1MouseWheel(Sender: TObject; Shift: TShiftState;
@@ -429,7 +431,7 @@ var
   png: TPngImage;
   ab: array of byte;
 begin
-  ImageViewer2.Visible := True;
+  if AniIndicator2.Visible then Abort;
 
   image := nil;
   dst := nil;
@@ -437,80 +439,98 @@ begin
   contours := nil;
   storage := nil;
 
-  fn := ExtractFilePath(ParamStr(0))+'temp.png';
-  ImageViewer1.Bitmap.SaveToFile(fn);
 
-  stream := TMemoryStream.Create;
-  try
-    ImageViewer1.Bitmap.SaveToStream(stream);
+  AniIndicator2.Enabled := True;
+  AniIndicator2.Visible := True;
+  AniIndicator2.Align := TAlignLayout.HorzCenter;
+  ImageViewer2.Enabled := False;
+  //#TODO: fix bug that sometimes it returns a blank picture, which didn't without threads
+  Async(
+    procedure
+    begin
+//      Application.ProcessMessages;
 
-//    png := TPngImage.Create;
-//    stream.Position := 0;
-//    png.LoadFromStream(stream);
-////    png.SaveToFile(fn);
-//    stream.Position := 0;
-//    png.SaveToStream(stream);
-////    png.Free;
+//        fn := ExtractFilePath(ParamStr(0))+'temp.png';
+//        ImageViewer1.Bitmap.SaveToFile(fn);
 
-    // copy to array of bytes
-    stream.Position := 0;
-    SetLength(ab, stream.Size);
-    stream.Read(ab[0], stream.Size);
-//    stream.Free;
+      stream := TMemoryStream.Create;
+      try
+        ImageViewer1.Bitmap.SaveToStream(stream);
 
-    Sleep(100);
-    try
-//      stream.Position := 0;
-      mat := cvCreateMat(1, Length(ab), CV_8UC1);
-//      mat := cvInitMatHeader(@mat, 1, Length(ab), CV_8U, @ab[0]);
-//      cvCreateMatHeader(1, Length(ab), CV_8U);
-      mat.data.ptr := @ab[0];
-      image := cvDecodeImage(mat, CV_LOAD_IMAGE_UNCHANGED);
-      Sleep(100);
+    //    png := TPngImage.Create;
+    //    stream.Position := 0;
+    //    png.LoadFromStream(stream);
+    ////    png.SaveToFile(fn);
+    //    stream.Position := 0;
+    //    png.SaveToStream(stream);
+    ////    png.Free;
 
-//      image := cvLoadImage(PAnsiChar(fn), CV_LOAD_IMAGE_UNCHANGED);
-      if Assigned(image) then
-      begin
-//        cvShowImage('cont', image);
-
-        img_gray := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
-        dst := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
-        storage := cvCreateMemStorage(0);
-        cvCvtColor(image, img_gray, CV_BGR2GRAY);
-        cvThreshold(img_gray, dst, 128, 255, CV_THRESH_BINARY_INV);
-        contours := AllocMem(SizeOf(tcvseq));
-        cvClearMemStorage(storage);
-        cvFindContours(dst, storage, @contours, SizeOf(TCvContour), CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cvPoint(0, 0));
-  //      cvArcLength(nil, contours., True);
-  //      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
-  //      contours := cvConvexHull2(contours);
-  //      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
-//        cvShowImage('thres', dst);
-//        cvShowImage('cont', image);
-        mat := cvEncodeImage('.png', dst);
+        // copy to array of bytes
         stream.Position := 0;
-        stream.Write(mat.data.ptr[0], mat.cols);
-//        cvSaveImage(PAnsiChar(fn), image);
+        SetLength(ab, stream.Size);
+        stream.Read(ab[0], stream.Size);
+    //    stream.Free;
+
         Sleep(100);
-//        ImageViewer2.Bitmap.LoadFromFile(fn);
-        stream.Position := 0;
-        ImageViewer2.Bitmap.LoadFromStream(stream);
-  //      cvWaitKey(0);
+        try
+    //      stream.Position := 0;
+          mat := cvCreateMat(1, Length(ab), CV_8UC1);
+    //      mat := cvInitMatHeader(@mat, 1, Length(ab), CV_8U, @ab[0]);
+    //      cvCreateMatHeader(1, Length(ab), CV_8U);
+          mat.data.ptr := @ab[0];
+          image := cvDecodeImage(mat, CV_LOAD_IMAGE_UNCHANGED);
+          Sleep(100);
 
-        cvReleaseImage(image);
-        cvReleaseImage(dst);
+    //      image := cvLoadImage(PAnsiChar(fn), CV_LOAD_IMAGE_UNCHANGED);
+          if Assigned(image) then
+          begin
+    //        cvShowImage('cont', image);
 
+            img_gray := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
+            dst := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
+            storage := cvCreateMemStorage(0);
+            cvCvtColor(image, img_gray, CV_BGR2GRAY);
+            cvThreshold(img_gray, dst, 128, 255, CV_THRESH_BINARY_INV);
+            contours := AllocMem(SizeOf(tcvseq));
+            cvClearMemStorage(storage);
+            cvFindContours(dst, storage, @contours, SizeOf(TCvContour), CV_RETR_TREE, CV_CHAIN_APPROX_SIMPLE, cvPoint(0, 0));
+      //      cvArcLength(nil, contours., True);
+            cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
+      //      contours := cvConvexHull2(contours);
+      //      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
+    //        cvShowImage('thres', dst);
+    //        cvShowImage('cont', image);
+            mat := cvEncodeImage('.png', image);
+            stream.Position := 0;
+            stream.Write(mat.data.ptr[0], mat.cols);
+    //        cvSaveImage(PAnsiChar(fn), image);
+            Sleep(100);
+    //        ImageViewer2.Bitmap.LoadFromFile(fn);
+            stream.Position := 0;
+            ImageViewer2.Bitmap.LoadFromStream(stream);
+      //      cvWaitKey(0);
+
+            cvReleaseImage(image);
+            cvReleaseImage(dst);
+
+          end;
+        except
+//          on E: Exception do
+//            ShowMessageFmt('%s:%s', [E.ClassName, E.Message]);
+        end;
+
+      finally
+        SetLength(ab, 0);
+        stream.Free;
       end;
-    except
-      on E: Exception do
-        ShowMessageFmt('%s:%s', [E.ClassName, E.Message]);
-    end;
-
-  finally
-    SetLength(ab, 0);
-    stream.Free;
-  end;
-
+    end
+  ).Await(
+    procedure begin
+      AniIndicator2.Enabled := False;
+      AniIndicator2.Visible := False;
+      ImageViewer2.Enabled := True;
+    end
+  );
 end;
 
 procedure TForm2.MenuItem3Click(Sender: TObject);
