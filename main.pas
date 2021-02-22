@@ -6,13 +6,23 @@ uses
   System.SysUtils, System.Types, System.UITypes, System.Classes, System.Variants,
   FMX.Types, FMX.Controls, FMX.Forms, FMX.Graphics, FMX.Dialogs, FMX.Layouts,
   FMX.ExtCtrls, FMX.Menus, FMX.Objects, FMX.Controls.Presentation, FMX.StdCtrls,
-  System.UIConsts, FMX.Effects, FMX.Types3D, ShlWapi,
+  System.UIConsts, FMX.Effects, FMX.Types3D, ShlWapi, System.Generics.Collections,
   System.Math.Vectors, FMX.Controls3D, FMX.Layers3D, FMX.Viewport3D,
   JclCompression, JclStrings, w2xconvunit, ocv.highgui_c, ocv.core_c,
   ocv.core.types_c, ocv.imgproc_c, ocv.imgproc.types_c, StrUtils, Winapi.Activex,
-  Vcl.Imaging.PngImage, OtlParallel, OtlEventMonitor;
+  Vcl.Imaging.PngImage, OtlParallel, OtlEventMonitor, FMX.ListBox;
 
 type
+
+  TPageDetails = class
+  private
+    FFrames: TCvRect;
+  public
+    property Frames: TCvRect read FFrames write FFrames;
+    constructor Create(const rect: TCvRect);
+    destructor Destroy; override;
+  end;
+
   TFileSorter = class(TStringList)
   protected
     function CompareStrings(const S1, S2: string): Integer; override;
@@ -72,6 +82,10 @@ type
     MenuItem20: TMenuItem;
     AniIndicator2: TAniIndicator;
     OmniEventMonitor1: TOmniEventMonitor;
+    StatusBar1: TStatusBar;
+    Label1: TLabel;
+    ListBox1: TListBox;
+    Selection1: TSelection;
     procedure MenuItem3Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
     procedure ImageViewer1MouseWheel(Sender: TObject; Shift: TShiftState;
@@ -85,9 +99,17 @@ type
       WheelDelta: Integer; var Handled: Boolean);
     procedure MenuItem2Click(Sender: TObject);
     procedure FormCloseQuery(Sender: TObject; var CanClose: Boolean);
+    procedure ImageViewer1ViewportPositionChange(Sender: TObject;
+      const OldViewportPosition, NewViewportPosition: TPointF;
+      const ContentSizeChanged: Boolean);
+    procedure FormDestroy(Sender: TObject);
+    procedure ListBox1Change(Sender: TObject);
   private
   { Private declarations }
     CoverIndex: Integer;
+
+    { Page details}
+    PageDetails: TObjectList<TPageDetails>;
 
     FScalePicture: Single;
     procedure SetScalePicture(const Value: Single);
@@ -152,6 +174,13 @@ begin
   end;
 
   OpenDialog1.Filter := 'Comic Files|*.cbz;*.cbr;*.cb7|All Files|*.*';
+
+  PageDetails := TObjectList<TPageDetails>.Create;
+end;
+
+procedure TForm2.FormDestroy(Sender: TObject);
+begin
+  PageDetails.Free;
 end;
 
 procedure TForm2.FormKeyUp(Sender: TObject; var Key: Word; var KeyChar: Char;
@@ -213,6 +242,37 @@ begin
   end
   else
     ScalePicture := ScalePicture - 0.1;
+end;
+
+procedure TForm2.ImageViewer1ViewportPositionChange(Sender: TObject;
+  const OldViewportPosition, NewViewportPosition: TPointF;
+  const ContentSizeChanged: Boolean);
+begin
+
+  Label1.Text := 'Position: ' + newviewportposition.X.ToString+
+                   ':' + newviewportposition.Y.ToString +
+                   ' ' + ImageViewer1.ContentBounds.Width.ToString;
+end;
+
+procedure TForm2.ListBox1Change(Sender: TObject);
+var
+  r: TCvRect;
+begin
+  if (ListBox1.Items.Count > 0) and (ListBox1.ItemIndex >= 0) then
+  begin
+    r := PageDetails.Items[ListBox1.Items.Count -1 - ListBox1.ItemIndex].Frames;
+
+    //ImageViewer1.Bitmap.FlipHorizontal;
+    Selection1.Position.X := r.x;
+    Selection1.Position.Y := r.y;
+    Selection1.Width := r.width;
+    Selection1.Height := r.height;
+
+    ImageViewer1.ViewportPosition :=PointF(r.x,r.y);
+
+//    ImageViewer1.Scale.X := ImageViewer1.Bitmap.Width / r.width;
+//    ImageViewer1.Scale.Y := ImageViewer1.Bitmap.Height/ r.height;
+  end;
 end;
 
 procedure TForm2.mnuOpenClick(Sender: TObject);
@@ -419,6 +479,19 @@ begin
 end;
 
 procedure TForm2.MenuItem2Click(Sender: TObject);
+var
+  image: pIplImage;
+  dst: pIplImage;
+  img_gray: pIplImage;
+  contours: pCvSeq;
+  storage: pCvMemStorage;
+  fn: ansistring;
+  mat: PCvMat;
+  png: TPngImage;
+  ab: array of byte;
+  stream: TMemoryStream;
+  N: Integer;
+  contoursCont: Integer;
 begin
   if AniIndicator2.Visible then Abort;
 
@@ -426,134 +499,126 @@ begin
   AniIndicator2.Visible := True;
   AniIndicator2.Align := TAlignLayout.HorzCenter;
   ImageViewer2.Enabled := False;
-  //#TODO: fix bug that sometimes it returns a blank picture, which didn't without threads
-  Async(
-    procedure
-    var
-      image: pIplImage;
-      dst: pIplImage;
-      img_gray: pIplImage;
-      contours: pCvSeq;
-      storage: pCvMemStorage;
-      fn: ansistring;
-      mat: PCvMat;
-      png: TPngImage;
-      ab: array of byte;
-      stream: TMemoryStream;
-      N: Integer;
-      contoursCont: Integer;
-    begin
-      image := nil;
-      dst := nil;
-      img_gray := nil;
-      contours := nil;
-      storage := nil;
+
+  image := nil;
+  dst := nil;
+  img_gray := nil;
+  contours := nil;
+  storage := nil;
 
 //      Application.ProcessMessages;
 
 //        fn := ExtractFilePath(ParamStr(0))+'temp.png';
 //        ImageViewer1.Bitmap.SaveToFile(fn);
 
-      stream := TMemoryStream.Create;
-      try
-        ImageViewer1.Bitmap.SaveToStream(stream);
+  stream := TMemoryStream.Create;
+  try
+    ImageViewer1.Bitmap.SaveToStream(stream);
 
-    //    png := TPngImage.Create;
-    //    stream.Position := 0;
-    //    png.LoadFromStream(stream);
-    ////    png.SaveToFile(fn);
-    //    stream.Position := 0;
-    //    png.SaveToStream(stream);
-    ////    png.Free;
+//    png := TPngImage.Create;
+//    stream.Position := 0;
+//    png.LoadFromStream(stream);
+////    png.SaveToFile(fn);
+//    stream.Position := 0;
+//    png.SaveToStream(stream);
+////    png.Free;
 
-        // copy to array of bytes
-        stream.Position := 0;
-        SetLength(ab, stream.Size);
-        stream.Read(ab[0], stream.Size);
-    //    stream.Free;
+    // copy to array of bytes
+    stream.Position := 0;
+    SetLength(ab, stream.Size);
+    stream.Read(ab[0], stream.Size);
+//    stream.Free;
 
-        Sleep(100);
-        try
-    //      stream.Position := 0;
-          mat := cvCreateMat(1, Length(ab), CV_8UC1);
-    //      mat := cvInitMatHeader(@mat, 1, Length(ab), CV_8U, @ab[0]);
-    //      cvCreateMatHeader(1, Length(ab), CV_8U);
-          mat.data.ptr := @ab[0];
-          image := cvDecodeImage(mat, CV_LOAD_IMAGE_UNCHANGED);
-          Sleep(100);
+    Sleep(100);
+    try
+//      stream.Position := 0;
+      mat := cvCreateMat(1, Length(ab), CV_8UC1);
+//      mat := cvInitMatHeader(@mat, 1, Length(ab), CV_8U, @ab[0]);
+//      cvCreateMatHeader(1, Length(ab), CV_8U);
+      mat.data.ptr := @ab[0];
+      image := cvDecodeImage(mat, CV_LOAD_IMAGE_UNCHANGED);
+      Sleep(100);
 
-    //      image := cvLoadImage(PAnsiChar(fn), CV_LOAD_IMAGE_UNCHANGED);
-          if Assigned(image) then
-          begin
-    //        cvShowImage('cont', image);
+//      image := cvLoadImage(PAnsiChar(fn), CV_LOAD_IMAGE_UNCHANGED);
+      if Assigned(image) then
+      begin
+//        cvShowImage('cont', image);
+        img_gray := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
+        dst := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
+        storage := cvCreateMemStorage(0);
+        cvCvtColor(image, img_gray, CV_BGR2GRAY);
+        cvThreshold(img_gray, dst, 128, 255, CV_THRESH_BINARY_INV);
+        //contours := AllocMem(SizeOf(tcvseq));
+        cvClearMemStorage(storage);
+        cvSmooth(dst, dst, CV_GAUSSIAN, 9, 9); //to improve speed in contour detection
+        contours := nil;
+        contoursCont :=  cvFindContours(dst, storage, @contours, SizeOf(TCvContour), CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cvPoint(0, 0));
 
-            img_gray := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
-            dst := cvCreateImage(CvSize(image^.width, image^.height), IPL_DEPTH_8U, 1);
-            storage := cvCreateMemStorage(0);
-            cvCvtColor(image, img_gray, CV_BGR2GRAY);
-            cvThreshold(img_gray, dst, 128, 255, CV_THRESH_BINARY_INV);
-            //contours := AllocMem(SizeOf(tcvseq));
-            cvClearMemStorage(storage);
-            cvSmooth(dst, dst, CV_GAUSSIAN, 9, 9); //to improve speed in contour detection
-            contours := nil;
-            contoursCont :=  cvFindContours(dst, storage, @contours, SizeOf(TCvContour), CV_RETR_EXTERNAL, CV_CHAIN_APPROX_SIMPLE, cvPoint(0, 0));
-
-            //if (contoursCont > 0) and (contoursCont < 50) then
+        //if (contoursCont > 0) and (contoursCont < 50) then
+        begin
+          PageDetails.Clear;
+          while Assigned(contours) do
+            if CV_IS_SEQ_CLOSED(contours) then
             begin
-              while Assigned(contours) do
-                if CV_IS_SEQ_CLOSED(contours) then
-                begin
-                  //contours := cvConvexHull2(contours);
-                  var rect := cvBoundingRect(contours);
-                  if rect.width > 100  then
-                  begin
-                    cvRectangle(image, cvPoint(rect.x, rect.y),
-                      cvPoint(rect.x + rect.width, rect.y + rect.height),
-                        CV_RGB(-1,250,0), 3);
-                    cvDrawContours(image, contours,
-                        CV_RGB(255, 0, 0),
-                        CV_RGB(255, 0, 0), 2, -1, CV_AA, cvPoint(0, 0));
-                  end;
-                  contours := contours^.h_next;
-                end;
+              //contours := cvConvexHull2(contours);
+              var rect := cvBoundingRect(contours);
+              if rect.width > 100  then
+              begin
+                PageDetails.Add(TPageDetails.Create(rect));
+                cvRectangle(image, cvPoint(rect.x, rect.y),
+                  cvPoint(rect.x + rect.width, rect.y + rect.height),
+                    CV_RGB(-1,250,0), 3);
+                cvDrawContours(image, contours,
+                    CV_RGB(255, 0, 0),
+                    CV_RGB(255, 0, 0), 2, 2, CV_AA, cvPoint(0, 0));
+              end;
+              contours := contours^.h_next;
             end;
-
-      //      cvArcLength(nil, contours., True);
-      //      contours := cvConvexHull2(contours);
-      //      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
-    //        cvShowImage('thres', dst);
-    //        cvShowImage('cont', image);
-            mat := cvEncodeImage('.png', image);
-            stream.Position := 0;
-            stream.Write(mat.data.ptr[0], mat.cols);
-    //        cvSaveImage(PAnsiChar(fn), image);
-            Sleep(100);
-    //        ImageViewer2.Bitmap.LoadFromFile(fn);
-            stream.Position := 0;
-            ImageViewer2.Bitmap.Clear(0);
-            ImageViewer2.Bitmap.LoadFromStream(stream);
-
-            cvReleaseImage(image);
-            cvReleaseImage(dst);
-
-          end;
-        except
-//          on E: Exception do
-//            ShowMessageFmt('%s:%s', [E.ClassName, E.Message]);
+            ListBox1.Clear;
+            for N := (PageDetails.Count - 1) downto 0 do
+            begin
+              ListBox1.Items.Add('x: '+
+                PageDetails.Items[N].Frames.x.ToString + ' y: ' +
+                PageDetails.Items[N].Frames.y.ToString + ' width: '+
+                PageDetails.Items[N].Frames.width.ToString + ' height: '+
+                PageDetails.Items[N].Frames.height.ToString
+              );
+            end;
         end;
 
-      finally
-        SetLength(ab, 0);
-        stream.Free;
+  //      cvArcLength(nil, contours., True);
+  //      contours := cvConvexHull2(contours);
+  //      cvDrawContours(image, contours, CV_RGB(100, 200, 0), CV_RGB(200, 100, 0), 2, -1, CV_AA, cvPoint(0, 0));
+  //        cvShowImage('thres', dst);
+  //        cvShowImage('cont', image);
+        mat := cvEncodeImage('.png', image);
+        stream.Position := 0;
+        stream.Write(mat.data.ptr[0], mat.cols);
+  //        cvSaveImage(PAnsiChar(fn), image);
+        Sleep(100);
+  //        ImageViewer2.Bitmap.LoadFromFile(fn);
+        stream.Position := 0;
+        ImageViewer2.Bitmap.Clear(0);
+        ImageViewer2.Bitmap.LoadFromStream(stream);
+
+        cvReleaseImage(image);
+        cvReleaseImage(dst);
+
       end;
-    end
-  ).Await(
-    procedure begin
-      AniIndicator2.Enabled := False;
-      AniIndicator2.Visible := False;
-      ImageViewer2.Enabled := True;
-    end
-  );
+    except
+  //          on E: Exception do
+  //            ShowMessageFmt('%s:%s', [E.ClassName, E.Message]);
+    end;
+
+  finally
+    SetLength(ab, 0);
+    stream.Free;
+  end;
+
+  AniIndicator2.Enabled := False;
+  AniIndicator2.Visible := False;
+  ImageViewer2.Enabled := True;
+
 end;
 
 procedure TForm2.MenuItem3Click(Sender: TObject);
@@ -747,5 +812,18 @@ begin
   Result := StrCmpLogicalW(PChar(S1), PChar(S2));
 end;
 
+
+{ TPageDetails }
+
+constructor TPageDetails.Create(const rect: TCvRect);
+begin
+  FFrames := rect;
+end;
+
+destructor TPageDetails.Destroy;
+begin
+
+  inherited;
+end;
 
 end.
