@@ -8,6 +8,7 @@ uses
   FMX.ExtCtrls, FMX.Menus, FMX.Objects, FMX.Controls.Presentation, FMX.StdCtrls,
   System.UIConsts, FMX.Effects, FMX.Types3D, ShlWapi, System.Generics.Collections,
   System.Math.Vectors, FMX.Controls3D, FMX.Layers3D, FMX.Viewport3D,
+  System.Generics.Defaults,
   JclCompression, JclStrings, w2xconvunit, ocv.highgui_c, ocv.core_c,
   ocv.core.types_c, ocv.imgproc_c, ocv.imgproc.types_c, StrUtils, Winapi.Activex,
   Vcl.Imaging.PngImage, OtlParallel, OtlEventMonitor, FMX.ListBox;
@@ -16,9 +17,8 @@ type
 
   TPageDetails = class
   private
-    FFrames: TCvRect;
+    Frame: TCvRect;
   public
-    property Frames: TCvRect read FFrames write FFrames;
     constructor Create(const rect: TCvRect);
     destructor Destroy; override;
   end;
@@ -260,7 +260,7 @@ var
 begin
   if (ListBox1.Items.Count > 0) and (ListBox1.ItemIndex >= 0) then
   begin
-    r := PageDetails.Items[ListBox1.Items.Count -1 - ListBox1.ItemIndex].Frames;
+    r := PageDetails.Items[ListBox1.ItemIndex].Frame;
 
     //ImageViewer1.Bitmap.FlipHorizontal;
     Selection1.Position.X := r.x;
@@ -574,14 +574,41 @@ begin
               end;
               contours := contours^.h_next;
             end;
+            // sort frames using manga or comic orientation
+            PageDetails.Sort(
+              TComparer<TPageDetails>.Construct(
+                function(const A, B: TPageDetails): Integer
+                begin
+                  if (A.Frame.y * image.width + A.Frame.x < B.Frame.y * image.width + B.Frame.x)
+                  then
+                  begin
+                    // consider a frame in the left side with its y position a little bit
+                    // below the right frame (less the 3rd height) as prior since it
+                    // might be a scanning issue (angle)
+                    if (B.Frame.x + B.Frame.width < A.Frame.x)
+                    and (B.Frame.y < (A.Frame.y + A.Frame.height/3))
+                    then
+                      Result := 1
+                    else
+                      Result := -1
+                  end
+                  else if A.Frame.y = B.Frame.y then
+                    Result := 0
+                  else
+                  begin
+                    Result := 1;
+                  end;
+                end
+              )
+            );
             ListBox1.Clear;
-            for N := (PageDetails.Count - 1) downto 0 do
+            for N := 0 to (PageDetails.Count - 1) do
             begin
               ListBox1.Items.Add('x: '+
-                PageDetails.Items[N].Frames.x.ToString + ' y: ' +
-                PageDetails.Items[N].Frames.y.ToString + ' width: '+
-                PageDetails.Items[N].Frames.width.ToString + ' height: '+
-                PageDetails.Items[N].Frames.height.ToString
+                PageDetails.Items[N].Frame.x.ToString + ' y: ' +
+                PageDetails.Items[N].Frame.y.ToString + ' width: '+
+                PageDetails.Items[N].Frame.width.ToString + ' height: '+
+                PageDetails.Items[N].Frame.height.ToString
               );
             end;
         end;
@@ -817,7 +844,7 @@ end;
 
 constructor TPageDetails.Create(const rect: TCvRect);
 begin
-  FFrames := rect;
+  Frame := rect;
 end;
 
 destructor TPageDetails.Destroy;
