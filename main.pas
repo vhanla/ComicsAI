@@ -11,7 +11,8 @@ uses
   System.Generics.Defaults,
   JclCompression, JclStrings, w2xconvunit, ocv.highgui_c, ocv.core_c,
   ocv.core.types_c, ocv.imgproc_c, ocv.imgproc.types_c, StrUtils, Winapi.Activex,
-  Vcl.Imaging.PngImage, OtlParallel, OtlEventMonitor, FMX.ListBox;
+  Vcl.Imaging.PngImage, Vcl.Imaging.JPEG,
+  OtlParallel, OtlEventMonitor, FMX.ListBox;
 
 type
 
@@ -289,6 +290,7 @@ var
   L: TRectangle;
   LBmp: TBitmap;
   SL: TFileSorter;
+  ImageFound: Boolean;
 begin
   if OpenDialog1.Execute then
   begin
@@ -332,130 +334,129 @@ begin
               // unselect to exclude it from next item selection
               LArchive.Items[Integer(SL.Objects[I])].Selected := False;
 
+              Image := TImage.Create(Self);
+
+              LStream.Position := 0;
               case IndexStr(LArchive.Items[Integer(SL.Objects[I])].PackedExtension,
               ['.jpg', '.png', '.bmp', '.gif', '.webp', '.avif', '.heif', '.flif'])
                of
-                0: // jpg
+                0, 1, 2, 3: // jpg, png, bmp and gif are supported by FMX TBitmap
                 begin
-                  // create cover
-                  Cover := TLayer3D.Create(Self);
-                  Cover.Parent := Coverflow;
-
-                  Cover.Projection := TProjection.Screen;
-                  Cover.Width := Round(Coverflow.Height * 0.5);
-                  Cover.Height := Round(Round(Coverflow.Height * 0.5) * 1.5);
-                  Cover.ZWrite := True;
-                  Cover.Fill.Color := Viewport3D1.Color;
-                  Cover.Fill.Kind := TBrushKind.Solid;
-                  Cover.Transparency := True;
-                  Cover.OnLayerMouseDown := DoCoverMouseDown;
-                  Cover.Tag := J;
-                  Cover.Padding.Rect := TRectF.Create(0, 0, 0, 0);
-                  Cover.Position.Y := Trunc((Coverflow.Height + Round(Coverflow.Height * 0.5)) / 2);
-                  Cover.Cursor := crHandPoint;
-
-                  if J = 0 then
-                  begin
-                    Cover.Position.X := Coverflow.Width / 2;
-                  end
-                  else
-                  begin
-                    Cover.Position.X := (I + 1) * (Round(Coverflow.Height * 0.5) / 3) + Coverflow.Width / 2;
-                    Cover.Position.Z := Round(Coverflow.Height * 0.5) * 2;
-                    Cover.RotationAngle.Y := 70;
-                  end;
-
-                  // Child
-                  Layout := TLayout.Create(Self);
-                  Layout.Parent := Cover;
-                  Layout.Align := TAlignLayout.Top;
-                  Layout.Height := Trunc(Cover.Height / 2); // original = 2
-                  Layout.Padding.Rect := TRectF.Create(0, 0, 0, 0);
-                  Layout.Cursor := crHandPoint;
-
-                  // This rectangle is necessary to avoid blank lines on the image
-                  L := TRectangle.Create(Self);
-                  L.Parent := Layout;
-                  L.Align := TAlignLayout.Top;
-                  L.Height := Trunc(Cover.Height / 2);
-                  L.Fill.Kind := TBrushKind.None;
-                  L.Stroke.Color := Viewport3D1.Color;
-                  L.Stroke.Kind := TBrushKind.None;
-
-                  Image := TImage.Create(Self);
-                  Image.Parent := Layout;
-                  Image.Padding.Rect := TRectF.Create(0, 0, 0, 0);
-                  Image.TagString := LArchive.Items[Integer(SL.Objects[I])].PackedName;
-
-  //                LStream.Position := 0;
-  //                TImageThread.Create(Image, LStream).Start;
-
+                  ImageFound := True;
                   LBmp := TBitmap.Create;
                   try
-                    LStream.Position := 0;
                     LBmp.LoadFromStream(TStream(LStream));
                     Image.Width := LBmp.Width;
                     Image.Height := LBmp.Height;
                     Image.Bitmap := LBmp;
-
                     ImageViewer1.Bitmap := LBmp;
                   finally
                     LBmp.Free;
                   end;
-
-                  Image.WrapMode := TImageWrapMode.Stretch;
-                  Image.Align := TAlignLayout.Fit;
-                  Image.HitTest := True;
-                  //Image.TagString :=
-                  Image.Cursor := crHandPoint;
-                  //TImageThread.Create();
-                  Image.OnMouseDown := DoCoverMouseDown;
-                  Image.Tag := J;
-
-                  Effect := TReflectionEffect.Create(Self);
-                  Effect.Parent := Image;
-                  Effect.Opacity := 0.6;
-
-                  // Opacity animation
-                  Cover.Opacity := 0.01;
-                  Cover.AnimateFloat('Opacity', 1, 0.5);
-
-                  // Load thumb
-                  Cover.TagObject := Image;
-                  Inc(J);
-
-                  Application.ProcessMessages;
-
-                end;
-                1: // png
-                begin
-
-                end;
-                2: // bmp
-                begin
-
-                end;
-                3: // gif
-                begin
-
                 end;
                 4: // webp
                 begin
-
+                  ImageFound := False;
                 end;
                 5: // avif
                 begin
-
+                  ImageFound := False;
                 end;
                 6: // heif
                 begin
-
+                  ImageFound := False;
                 end;
                 7: // flif
                 begin
-
+                  ImageFound := False;
+                end;
+                else
+                begin
+                  ImageFound := False;
                 end;
               end;
+
+              if ImageFound then
+              begin
+                // create cover
+                Cover := TLayer3D.Create(Self);
+                Cover.Parent := Coverflow;
+
+                Cover.Projection := TProjection.Screen;
+                Cover.Width := Round(Coverflow.Height * 0.5);
+                Cover.Height := Round(Round(Coverflow.Height * 0.5) * 1.5);
+                Cover.ZWrite := True;
+                Cover.Fill.Color := Viewport3D1.Color;
+                Cover.Fill.Kind := TBrushKind.Solid;
+                Cover.Transparency := True;
+                Cover.OnLayerMouseDown := DoCoverMouseDown;
+                Cover.Tag := J;
+                Cover.Padding.Rect := TRectF.Create(0, 0, 0, 0);
+                Cover.Position.Y := Trunc((Coverflow.Height + Round(Coverflow.Height * 0.5)) / 2);
+                Cover.Cursor := crHandPoint;
+
+                if J = 0 then
+                begin
+                  Cover.Position.X := Coverflow.Width / 2;
+                end
+                else
+                begin
+                  Cover.Position.X := (I + 1) * (Round(Coverflow.Height * 0.5) / 3) + Coverflow.Width / 2;
+                  Cover.Position.Z := Round(Coverflow.Height * 0.5) * 2;
+                  Cover.RotationAngle.Y := 70;
+                end;
+
+                // Child
+                Layout := TLayout.Create(Self);
+                Layout.Parent := Cover;
+                Layout.Align := TAlignLayout.Top;
+                Layout.Height := Trunc(Cover.Height / 2); // original = 2
+                Layout.Padding.Rect := TRectF.Create(0, 0, 0, 0);
+                Layout.Cursor := crHandPoint;
+
+                // This rectangle is necessary to avoid blank lines on the image
+                L := TRectangle.Create(Self);
+                L.Parent := Layout;
+                L.Align := TAlignLayout.Top;
+                L.Height := Trunc(Cover.Height / 2);
+                L.Fill.Kind := TBrushKind.None;
+                L.Stroke.Color := Viewport3D1.Color;
+                L.Stroke.Kind := TBrushKind.None;
+
+                Image.Parent := Layout;
+                Image.Padding.Rect := TRectF.Create(0, 0, 0, 0);
+                Image.TagString := LArchive.Items[Integer(SL.Objects[I])].PackedName;
+
+  //                LStream.Position := 0;
+  //                TImageThread.Create(Image, LStream).Start;
+
+
+
+                Image.WrapMode := TImageWrapMode.Stretch;
+                Image.Align := TAlignLayout.Fit;
+                Image.HitTest := True;
+                //Image.TagString :=
+                Image.Cursor := crHandPoint;
+                //TImageThread.Create();
+                Image.OnMouseDown := DoCoverMouseDown;
+                Image.Tag := J;
+
+                Effect := TReflectionEffect.Create(Self);
+                Effect.Parent := Image;
+                Effect.Opacity := 0.6;
+
+                // Opacity animation
+                Cover.Opacity := 0.01;
+                Cover.AnimateFloat('Opacity', 1, 0.5);
+
+                // Load thumb
+                Cover.TagObject := Image;
+                Inc(J);
+              end
+              else
+                Image.Free; // remove it since it was not an image
+
+              Application.ProcessMessages;
             finally
               LStream.Free;
             end;
